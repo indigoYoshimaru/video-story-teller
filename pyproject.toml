@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "story-teller"
+version = "0.1.0"
+description = "AI pipeline to tell and visualize stories from reddit stories"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+[tool.poetry.group.dev.dependencies]
+pydantic = "^2.7.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
