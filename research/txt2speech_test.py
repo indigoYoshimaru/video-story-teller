@@ -10,7 +10,7 @@ def txt2speech(text):
     ).to("cuda")
 
     set_seed(100)
-    model.speaking_rate = 1.0
+    model.speaking_rate = 1
 
     inputs = tokenizer(
         text,
@@ -21,8 +21,8 @@ def txt2speech(text):
         output = model(**inputs).waveform
 
     print(output)
-    output = output.clone().detach().cpu()
-
+    # output = output.clone().detach().cpu()
+    output = output.cpu().numpy().squeeze()
     return output, model
 
 def tts_test(text): 
