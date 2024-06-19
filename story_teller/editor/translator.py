@@ -25,6 +25,7 @@ class Translator(BaseModel):
     decode_params: Dict = dict(skip_special_tokens=True)
     tokenizer: Any = None
     model: Any = None
+    device: Any = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -50,7 +51,7 @@ class Translator(BaseModel):
             raise e
         else:
             logger.success(f"Translator model initialized")
-            super().__init__(tokenizer=tokenizer, model=model)
+            super().__init__(tokenizer=tokenizer, model=model, device=device)
             self.generator_params["decoder_start_token_id"] = tokenizer.lang_code_to_id[
                 config.dst_lang
             ]
@@ -60,8 +61,11 @@ class Translator(BaseModel):
             assert input_text, "Empty input text"
 
             split_texts = input_text.split("\n\n")
+            # add batch processing!
 
-            input_ids = self.tokenizer(split_texts, **self.tokenizer_params)
+            input_ids = self.tokenizer(split_texts, **self.tokenizer_params).to(
+                self.device
+            )
             output_ids = self.model.generate(**input_ids, **self.generator_params)
             output_texts = self.tokenizer.batch_decode(output_ids, **self.decode_params)
 
@@ -70,7 +74,7 @@ class Translator(BaseModel):
             logger.error(f"{type(e).__name__}: {e} happened during translation")
             raise e
         else:
-            return output_texts.join("\n\n")
+            return "\n\n".join(output_texts)
 
 
 class TranslatorPipeline(BaseModel):
@@ -85,23 +89,30 @@ class TranslatorPipeline(BaseModel):
         from toolz.curried import map
         from story_teller.database.crud.read import get_raw_posts
 
-        logger.info(f"Running translator pipeline...")
+        try:
+            logger.info(f"Running translator pipeline...")
 
-        translated_ids = pipe(
-            list(get_raw_posts(self.db_client)),
-            map(self.run_translate),
-            map(self.update_to_db),
-        )
-        logger.info(f"Closing translator pipeline...")
-        return translated_ids
+            posts = list(get_raw_posts(self.db_client))[:1]
+            logger.info(f"{posts=}")
+            translated_ids = pipe(
+                posts,
+                map(self.run_translate),
+                list,
+                map(self.update_to_db),
+            )
+            logger.info(f"Closing translator pipeline...")
+        except Exception as e:
+            raise e
+        else:
+            return translated_ids
 
     def run_translate(self, post):
         from story_teller.database.enum import StatusEnum
 
         try:
             logger.info(f"Translating post {post['post_id']}-{post['title']}")
-            post["vi-title"] = self.translator(post["title"])
-            post["vi-body"] = self.translator(post["body"])
+            post["vi-title"] = self.translator.translate(post["title"])
+            post["vi-body"] = self.translator.translate(post["body"])
 
             logger.info(f"{post['vi-title']=}")
         except Exception as e:
@@ -116,4 +127,5 @@ class TranslatorPipeline(BaseModel):
     def update_to_db(self, post):
         from story_teller.database.crud.update import update_post_by_id
 
+        logger.info(f"Updating to DB {post['post_id']}-{post['title']}")
         return update_post_by_id(self.db_client, post_id=post["post_id"], post=post)

@@ -12,5 +12,6 @@ def translate_all_raw(
     e2v_translator = translator.Translator()
     db_client = connect.connect_db()
     translator_pipeline = translator.TranslatorPipeline(db_client=db_client, translator=e2v_translator)
-    print(translator_pipeline.run_pipeline())
+    translated_ids = translator_pipeline.run_pipeline()
+    return translated_ids
 
