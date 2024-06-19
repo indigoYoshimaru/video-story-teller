@@ -15,7 +15,7 @@ class CrawlerPipeline(BaseModel):
     def run_pipeline(self, posts):
         from toolz.curried import map, filter
 
-        logger.info(f"Running pipeline...")
+        logger.info(f"Running crawler pipeline...")
         results = pipe(
             posts,
             filter(self.run_filter),
@@ -24,7 +24,7 @@ class CrawlerPipeline(BaseModel):
             list, 
             self.insert_to_db,
         )
-        logger.info(f"Closing pipeline...")
+        logger.info(f"Closing crawler pipeline...")
         return results
 
     def run_filter(self, post):

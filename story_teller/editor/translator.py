@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import Text, Dict, Any, List
+from typing import Text, Dict, Any
+from pymongo import MongoClient
 from loguru import logger
 
 
@@ -28,7 +29,7 @@ class Translator(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def __init__(self, config: TranslatorConfig):
+    def __init__(self, config: TranslatorConfig = None):
         if not config:
             config = TranslatorConfig()
 
@@ -72,3 +73,47 @@ class Translator(BaseModel):
             return output_texts.join("\n\n")
 
 
+class TranslatorPipeline(BaseModel):
+    db_client: MongoClient
+    translator: Translator
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def run_pipeline(self):
+        from toolz import pipe
+        from toolz.curried import map
+        from story_teller.database.crud.read import get_raw_posts
+
+        logger.info(f"Running translator pipeline...")
+
+        translated_ids = pipe(
+            list(get_raw_posts(self.db_client)),
+            map(self.run_translate),
+            map(self.update_to_db),
+        )
+        logger.info(f"Closing translator pipeline...")
+        return translated_ids
+
+    def run_translate(self, post):
+        from story_teller.database.enum import StatusEnum
+
+        try:
+            logger.info(f"Translating post {post['post_id']}-{post['title']}")
+            post["vi-title"] = self.translator(post["title"])
+            post["vi-body"] = self.translator(post["body"])
+
+            logger.info(f"{post['vi-title']=}")
+        except Exception as e:
+            logger.error(
+                f"{type(e).__name__}: {e} happened during running translation in translator pipeline"
+            )
+            return post
+        else:
+            post["status"] = StatusEnum.translated.value
+            return post
+
+    def update_to_db(self, post):
+        from story_teller.database.crud.update import update_post_by_id
+
+        return update_post_by_id(self.db_client, post_id=post["post_id"], post=post)
