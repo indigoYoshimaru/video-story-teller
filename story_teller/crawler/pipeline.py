@@ -21,7 +21,7 @@ class CrawlerPipeline(BaseModel):
             filter(self.run_filter),
             map(self.process),
             map(self.create_video_folder),
-            list, 
+            list,
             self.insert_to_db,
         )
         logger.info(f"Closing crawler pipeline...")
@@ -53,8 +53,10 @@ class CrawlerPipeline(BaseModel):
                 post_id=post.id,
                 subreddit=post.subreddit.display_name,
                 title=post.title,
+                title_vn="",
                 url=post.url,
                 body=post.selftext,
+                body_vn="",
                 created=post.created,
                 status=StatusEnum.raw.value,
                 image_dir=os.path.join(self.video_root_path, post.id, "images"),
@@ -82,15 +84,16 @@ class CrawlerPipeline(BaseModel):
                 os.makedirs(audio_dir)
         except Exception as e:
             logger.error(
-                f"{type(e).__name__}: {e}. Cannot create folders for {post['id']}-{post['title']}"
+                f"{type(e).__name__}: {e}. Cannot create folders for {post['post_id']}-{post['title']}"
             )
             return post
-        else: 
+        else:
             return post
 
     def insert_to_db(self, posts):
         from story_teller.database.crud.create import insert_post_many
-        logger.info(f'{type(posts)}-{posts}')
+
+        logger.info(f"{type(posts)}-{posts}")
         inserted_ids = insert_post_many(posts=posts, db_client=self.db_client)
         logger.info(f"Inserted ids: {inserted_ids}")
         return inserted_ids

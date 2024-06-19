@@ -1,2 +1,10 @@
-def update_post_by_id(db_client, post_id, post):
-    return db_client.story_teller.posts.update(dict(post_id = post_id), post).upserted_id
+def update_post(db_client, post: dict):
+    try:
+        upserted_id = db_client.story_teller.posts.update_one(
+            {"_id": post.get("_id")},
+            {"$set": post},
+        ).upserted_id
+    except Exception as e:
+        raise e
+    else:
+        return upserted_id

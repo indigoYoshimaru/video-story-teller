@@ -56,18 +56,32 @@ class Translator(BaseModel):
                 config.dst_lang
             ]
 
+    def split_batch(self, input_text: Text, batch_size: int = 5):
+
+        try:
+            from itertools import islice
+
+            split_texts = iter(input_text.split("\n\n"))
+            return iter(lambda: list(islice(split_texts, batch_size)), [])
+        except Exception as e:
+            logger.error(f"{type(e).__name__}: {e} cannot split batch")
+            raise e
+
     def translate(self, input_text: Text):
         try:
             assert input_text, "Empty input text"
-
-            split_texts = input_text.split("\n\n")
+            output_texts = []
             # add batch processing!
+            batch_texts = self.split_batch(input_text)
 
-            input_ids = self.tokenizer(split_texts, **self.tokenizer_params).to(
-                self.device
-            )
-            output_ids = self.model.generate(**input_ids, **self.generator_params)
-            output_texts = self.tokenizer.batch_decode(output_ids, **self.decode_params)
+            for split_texts in batch_texts:
+                input_ids = self.tokenizer(split_texts, **self.tokenizer_params).to(
+                    self.device
+                )
+                output_ids = self.model.generate(**input_ids, **self.generator_params)
+                output_texts += self.tokenizer.batch_decode(
+                    output_ids, **self.decode_params
+                )
 
             assert output_texts, "Empty output text"
         except Exception as e:
@@ -84,7 +98,7 @@ class TranslatorPipeline(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    def run_pipeline(self):
+    def run_pipeline(self, limit: int = 5):
         from toolz import pipe
         from toolz.curried import map
         from story_teller.database.crud.read import get_raw_posts
@@ -92,13 +106,13 @@ class TranslatorPipeline(BaseModel):
         try:
             logger.info(f"Running translator pipeline...")
 
-            posts = list(get_raw_posts(self.db_client))[:1]
+            posts = list(get_raw_posts(self.db_client))[:limit]
             logger.info(f"{posts=}")
             translated_ids = pipe(
                 posts,
                 map(self.run_translate),
-                list,
                 map(self.update_to_db),
+                list,
             )
             logger.info(f"Closing translator pipeline...")
         except Exception as e:
@@ -111,10 +125,9 @@ class TranslatorPipeline(BaseModel):
 
         try:
             logger.info(f"Translating post {post['post_id']}-{post['title']}")
-            post["vi-title"] = self.translator.translate(post["title"])
-            post["vi-body"] = self.translator.translate(post["body"])
+            post["title_vn"] = self.translator.translate(post["title"])
+            post["body_vn"] = self.translator.translate(post["body"])
 
-            logger.info(f"{post['vi-title']=}")
         except Exception as e:
             logger.error(
                 f"{type(e).__name__}: {e} happened during running translation in translator pipeline"
@@ -122,10 +135,24 @@ class TranslatorPipeline(BaseModel):
             return post
         else:
             post["status"] = StatusEnum.translated.value
+            logger.success(f"Translated {post['title_vn']=}")
             return post
 
     def update_to_db(self, post):
-        from story_teller.database.crud.update import update_post_by_id
+        from story_teller.database.crud.update import update_post
 
-        logger.info(f"Updating to DB {post['post_id']}-{post['title']}")
-        return update_post_by_id(self.db_client, post_id=post["post_id"], post=post)
+        try:
+            logger.info(f"Updating to DB {post['post_id']}-{post['title']}")
+
+            update_id = update_post(
+                self.db_client,
+                post=post,
+            )
+        except Exception as e:
+            logger.error(
+                f"{type(e).__name__}: {e} happened while updating post {post['post_id']}"
+            )
+            raise e
+        else:
+            logger.success(f"Updated post {post['post_id']}-{post['title']}")
+            return update_id
