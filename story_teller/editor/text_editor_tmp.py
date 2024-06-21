@@ -1,32 +1,32 @@
 from nicegui import ui, context
+# from story_teller.database import connect
+# from story_teller.database.crud import read, update
+from loguru import logger
 from pymongo import MongoClient
-import urllib.parse
-
-# Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017/")
-db = client.story_teller
-collection = db["posts"]
-
+# db_client = connect()
+db_client = MongoClient(host="localhost", port=27017)
+collection = db_client.story_teller.posts
 
 # Function to load data from MongoDB
 def load_data(post_id):
     post = collection.find_one({"post_id": post_id})
-    if post:
+    try: 
+        # post = read.get_post(db_client=db_client, post_id = post_id)
+        assert post
         entry_post_id.text = post.get("post_id", "")
         text_title_en.value = post.get("title", "")
         text_title_vn.value = post.get("title_vn", "")
         text_vietnamese.value = post.get("body_vn", "")
         text_english.value = post.get("body", "")
-    else:
+        
+    except Exception as e: 
         ui.notify("Post not found", type="negative")
-
-
 # Function to submit data to MongoDB
 def submit_data():
     post_id = entry_post_id.value
     title = text_title_en.value
     title_vn = text_title_vn.value
-    vietnamese_text = urllib.parse.quote(text_vietnamese.value.strip())
+    vietnamese_text = text_vietnamese.value.strip()
     english_text = text_english.value.strip()
 
     post_data = {
@@ -56,8 +56,7 @@ def open_post_selection_window():
         },
         {"name": "title", "label": "Title", "field": "title", "sortable": True},
     ]
-    with ui.dialog() as dialog:
-        # dialog.classes("w-500")
+    with ui.dialog().props('full-width') as dialog:
         dialog.open()
         with ui.card().classes("flex-card-grow h-full"):
             ui.label("Select Post").style("font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font")
@@ -89,15 +88,12 @@ def open_post_selection_window():
 ui.add_head_html("<style>.flex-grow .q-field__control {height: 100%;} </style>")
 ui.add_head_html("<style>textarea.q-field__native {min-height: 10px;} </style>")
 ui.add_head_html("<style>.flex-card-grow .q-dialog__inner {max-width: 1200px;} </style>")
-# ui.add_head_html("<style>card.q-dialog__inner--minimized  {max-width: 1200px;} </style>")
-# ui.add_body_html("<script src=\"https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js\"></script>")
-# src = "https://assets5.lottiefiles.com/packages/lf20_MKCnqtNQvg.json"
-# ui.html(f"<lottie-player src=\"{src}\" loop autoplay").classes('w-24')
 ui.query(".nicegui-content").classes("h-screen no-wrap")
 # Creating the main layout
 with ui.row().classes("w-full"):
     ui.label("Post ID").style("font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font")
     entry_post_id = ui.label().style("width: 50%; font-size: 20px; font-family: Iosevka Nerd Font ")
+    
 
 # with ui.grid(columns=2).style("max-width: 1200px; margin:auto;").classes("w-full gap-5 flex-grow"):
 with ui.row().classes("w-full gap-0"):
@@ -107,6 +103,7 @@ with ui.row().classes("w-full gap-0"):
     with ui.column().classes("w-1/2"):
         ui.label("Title-EN").style("font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font")
         text_title_en = ui.input().style("width: 90%; font-size: 14px; font-family: Iosevka Nerd Font")
+        
 with ui.row().classes("h-full w-full no-wrap"):
     with ui.column().classes("w-1/2 h-full"):
         ui.label("Body-VN").style("font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font")
@@ -133,7 +130,7 @@ with ui.row():
         "font-size: 16px;"
     )
     ui.button(icon="search", text="View Posts", on_click=open_post_selection_window).style(
-        "font-size: 16px;"
-    )
+        "font-size: 16px; "
+    ).props("outline rounded")
 
 ui.run()

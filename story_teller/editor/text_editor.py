@@ -1,104 +1,184 @@
-import tkinter as tk
-from tkinter import messagebox
-from pymongo import MongoClient
-
-from tkinter import simpledialog
-import urllib.parse
-import tkinter.font as tkFont
+from pydantic import BaseModel
+from loguru import logger
+from typing import Any, Text, List, Dict
+from nicegui import ui
 
 
-# Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017/")
-db = client.story_teller
-collection = db["posts"]
+class TextEditorConfig(BaseModel):
+    html_headers: List
+    # styles
+    label_style: Text
+    input_style: Text
+    textarea_style: Text
+    button_style: Text
+    # layouts
+    textarea_layout: Text
+    row_half_layout: Text
+    # props
+    button_props: Text
+    default_color: Text
+    positive_color: Text
+    chip_colors: List
 
-# Function to load data from MongoDB
-def load_data(post_id):
-    post = collection.find_one({"post_id": post_id})
-    if post:
-        text_vietnamese.delete("1.0", tk.END)
-        text_english.delete("1.0", tk.END)
-        text_vietnamese.insert(tk.END, urllib.parse.unquote(post.get("body_vn", "")))
-        text_english.insert(tk.END, post.get("body", ""))
-        entry_post_id.delete(0, tk.END)
-        entry_post_id.insert(0, post.get("post_id", ""))
-        entry_post_title.delete(0, tk.END)
-        entry_post_title.insert(0, post.get("title", ""))
-    else:
-        messagebox.showerror("Error", "Post not found")
+    def __init__(self, config_path: Text = "story_teller/editor/editor.yaml"):
+        from story_teller.utils import FileReader
 
-# Function to submit data to MongoDB
-def submit_data():
-    post_id = entry_post_id.get()
-    title = entry_post_title.get()
-    vietnamese_text = urllib.parse.quote(text_vietnamese.get("1.0", tk.END).strip())
-    english_text = text_english.get("1.0", tk.END).strip()
-    
-    post_data = {
-        "post_id": post_id,
-        "title": title,
-        "body_vn": vietnamese_text,
-        "body": english_text
-    }
-    
-    collection.update_one({"post_id": post_id}, {"$set": post_data}, upsert=True)
-    messagebox.showinfo("Success", "Data written to MongoDB")
+        config = FileReader().read(config_path)
+        super().__init__(**config)
 
-# Function to open the post selection window
-def open_post_selection_window():
-    post_selection_window = tk.Toplevel(root)
-    post_selection_window.title("Select Post")
-    post_selection_window.geometry("400x400")
 
-    posts = collection.find({"status": 1})
-    post_listbox = tk.Listbox(post_selection_window, font=font, width=50, height=20)
-    post_listbox.pack(padx=10, pady=10)
+class TextEditor(BaseModel):
+    db_client: Any
+    config: TextEditorConfig
+    label_dict: Dict = dict()
+    input_dict: Dict = dict()
+    textarea_dict: Dict = dict()
 
-    for post in posts:
-        post_listbox.insert(tk.END, f"{post['post_id']}: {post['title']}")
+    class Config:
+        arbitrary_types_allowed = True
 
-    def on_post_select(event):
-        selected_post = post_listbox.get(post_listbox.curselection())
-        post_id = selected_post.split(":")[0].strip()
-        load_data(post_id)
-        post_selection_window.destroy()
+    def __init__(
+        self,
+        db_client,
+        config: TextEditorConfig = None,
+        dark_mode: bool = False,
+    ):
+        if not config:
+            config = TextEditorConfig()
+        super().__init__(db_client=db_client, config=config)
+        global ui
+        # Create GUI
+        ui.dark_mode(dark_mode)
+        for header in config.html_headers:
+            ui.add_head_html(header)
+        ui.query(".nicegui-content").classes("h-screen no-wrap")
+        ui.colors(primary="#651fff")
+        ## Post's information layout: id, subreddit, date, link
+        with ui.row().classes("w-full gap-5"):
+            ui.chip("ID", color=self.config.chip_colors[1]).style(self.config.label_style)
+            self.label_dict["post_id"] = ui.label().style(self.config.label_style)
 
-    post_listbox.bind('<<ListboxSelect>>', on_post_select)
+            ui.chip("Subreddit", color=self.config.chip_colors[2])
+            self.label_dict["subreddit"] = ui.label().style(self.config.label_style)
 
-# Create the main window
-root = tk.Tk()
-root.title("Text Editor")
-root.geometry("1200x800")  # Set the window size
+            ui.chip("Date", color=self.config.chip_colors[3])
+            self.label_dict["created"] = ui.label().style(self.config.label_style)
 
-# Set font
-font = tkFont.Font(name="Iosevka Nerd Font", size=16)
+            # ui.chip("Link", color=self.config.chip_colors[3])
+            # self.label_dict["url"] = ui.label().style(self.config.label_style)
 
-# Layout widgets
-tk.Label(root, text="Post ID", font=font).grid(row=0, column=0, padx=10, pady=10)
-entry_post_id = tk.Entry(root, font=font)
-entry_post_id.grid(row=0, column=1, padx=10, pady=10)
+        with ui.row().classes("w-full gap-0"):
+            with ui.column().classes("w-1/2"):
+                ui.label("Title-VN").style(self.config.label_style)
+                self.input_dict["title_vn"] = ui.input().style(self.config.input_style)
 
-tk.Label(root, text="Post Title", font=font).grid(row=0, column=2, padx=10, pady=10)
-entry_post_title = tk.Entry(root, font=font)
-entry_post_title.grid(row=0, column=3, padx=10, pady=10)
+            with ui.column().classes("w-1/2"):
+                ui.label("Title-EN").style(self.config.label_style)
+                self.input_dict["title"] = ui.input().style(self.config.input_style)
 
-tk.Label(root, text="body_vn", font=font).grid(row=1, column=0, columnspan=2, padx=10, pady=10)
-tk.Label(root, text="body", font=font).grid(row=1, column=2, columnspan=2, padx=10, pady=10)
+        with ui.row().classes("h-full w-full no-wrap"):
+            with ui.column().classes("w-1/2 h-full"):
+                ui.label("Body-VN").style(self.config.label_style)
+                self.textarea_dict["body_vn"] = (
+                    ui.textarea()
+                    .style(self.config.textarea_style)
+                    .classes(self.config.textarea_layout)
+                )
+            with ui.column().classes("w-1/2 h-full"):
+                ui.label("Body-EN").style(self.config.label_style)
+                self.textarea_dict["body"] = (
+                    ui.textarea()
+                    .style(self.config.textarea_style)
+                    .classes(self.config.textarea_layout)
+                )
 
-text_vietnamese = tk.Text(root, height=25, width=50, font=font)
-text_vietnamese.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+        with ui.row():
+            # ui.button("Load", on_click=lambda: self.load_data(entry_post_id.value)).style(
+            #     self.config.button_style
+            # ).props(self.config.button_props)
+            ui.button(
+                icon="publish",
+                text="Submit",
+                color=self.config.default_color,
+            ).style(self.config.button_style).props(self.config.button_props).classes(
+                "shadow-lg"
+            )
+            ui.button(
+                icon="search",
+                text="View Posts",
+                color=self.config.default_color,
+                on_click=lambda: self.open_post_selection_window(),
+            ).style(self.config.button_style).props(self.config.button_props).classes(
+                "shadow-lg"
+            )
 
-text_english = tk.Text(root, height=25, width=50, font=font)
-text_english.grid(row=2, column=2, columnspan=2, padx=10, pady=10)
+    def load_data(self, post_id: Text):
+        from story_teller.database.crud import read
+        logger.info(f'Loading post {post_id}')
+        try:
+            post = read.get_post(self.db_client, post_id)
+            logger.info(f'{post=}')
+            assert post
+            for k, v in self.label_dict.items():
+                v.text = post[k]
+        except Exception as e:
+            msg = "Post not found"
+            logger.error(f"{type(e).__name__}: {e}. {msg}")
+            ui.notify(msg, type="negative")
 
-btn_load = tk.Button(root, text="Load", command=lambda: load_data(entry_post_id.get()), font=font)
-btn_load.grid(row=3, column=0, padx=10, pady=10)
+    def create_table_cols(self, feature_name):
+        feat_dict = dict(
+            name=feature_name,
+            label=feature_name,
+            field=feature_name,
+        )
+        if feature_name == "date":
+            feat_dict["sortable"] = True
+        return feat_dict
 
-btn_submit = tk.Button(root, text="Submit", command=submit_data, font=font)
-btn_submit.grid(row=3, column=1, padx=10, pady=10)
+    def open_post_selection_window(self):
+        from story_teller.database.crud import read
 
-btn_open_menu = tk.Button(root, text="Open Menu", command=open_post_selection_window, font=font)
-btn_open_menu.grid(row=3, column=2, columnspan=2, padx=10, pady=10)
+        try:
+            posts = list(read.get_translated_posts(self.db_client))
+            delete_keys = ["_id", "title_vn", "body", "body_vn", "image_dir", "audio_dir"]
+            for post in posts: 
+                for key in delete_keys: 
+                    del post[key] 
+                
+            logger.info(f"{posts=}")
+            columns = [self.create_table_cols(k) for k in posts[0].keys()]
+            logger.info(f"{columns=}")
+        except Exception as e:
+            msg = "Cannot load translated posts"
+            logger.error(f"{type(e).__name__}: {e}. {msg}")
 
-# Start the main event loop
-root.mainloop()
+        with ui.dialog().props("full-width") as dialog:
+            dialog.open()
+            with ui.card().classes("flex-card-grow h-full"):
+                ui.label("Select Post").style(self.config.label_style)
+
+                table = ui.table(
+                    title="Posts",
+                    columns=columns,
+                    rows=posts,
+                    row_key="post_id",
+                    pagination=10,
+                    selection="single",
+                )
+                table.add_slot(
+                    "body-cell-title",
+                    r'<td><a :href="props.row.url">{{ props.row.title }}</a></td>',
+                )
+
+                ui.button(
+                    "Edit",
+                    icon="edit",
+                    on_click=lambda: (
+                        self.load_data(table.selected[0]["post_id"]),
+                        dialog.close(),
+                    ),
+                )
+
+    def run(self):
+        ui.run(reload=False)

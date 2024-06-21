@@ -1,0 +1,20 @@
+html_headers:
+  - "<style>.flex-grow .q-field__control {height: 100%;} </style>"
+  - "<style>textarea.q-field__native {min-height: 10px;} </style>"
+# styles
+label_style: "font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font; color: #6200ea"
+input_style: "width: 90%; font-size: 14px; font-family: Iosevka Nerd Font;"
+textarea_style: "width: 100%; height: 100%; font-size: 16px; font-family: Iosevka Nerd Font;"
+button_style: "font-size: 16px; font-weight: bold; font-family: Iosevka Nerd Font"
+# layouts
+textarea_layout: "border flex-grow w-full"
+row_half_layout: "w-1/2 h-full"
+# props
+button_props: "rounded"
+default_color: "deep-purple-14"
+positive_color: "teal-8"
+chip_colors:
+  - "indigo-9"
+  - "amber-10"
+  - "pink-14"
+  - "blue-grey-14"

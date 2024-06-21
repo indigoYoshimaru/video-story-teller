@@ -8,6 +8,6 @@ app = Typer(no_args_is_help=True)
 app.add_typer(reddit.app)
 app.add_typer(editor.app)
 
-if __name__ == '__main__': 
+if __name__ in {"__main__", "__mp_main__"}:
     app()
 
