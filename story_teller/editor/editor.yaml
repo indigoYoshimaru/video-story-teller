@@ -3,6 +3,7 @@ html_headers:
   - "<style>textarea.q-field__native {min-height: 10px;} </style>"
 # styles
 label_style: "font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font; color: #6200ea"
+label_style_no_color: "font-size: 20px; font-weight: bold; font-family: Iosevka Nerd Font;"
 input_style: "width: 90%; font-size: 14px; font-family: Iosevka Nerd Font;"
 textarea_style: "width: 100%; height: 100%; font-size: 16px; font-family: Iosevka Nerd Font;"
 button_style: "font-size: 16px; font-weight: bold; font-family: Iosevka Nerd Font"
