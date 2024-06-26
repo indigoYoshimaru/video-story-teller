@@ -9,8 +9,8 @@ def txt2speech(text):
         "facebook/mms-tts-vie",
     ).to("cuda")
 
-    set_seed(100)
-    model.speaking_rate = 1
+    set_seed(500)
+    model.speaking_rate = 1.2
 
     inputs = tokenizer(
         text,
@@ -20,8 +20,6 @@ def txt2speech(text):
     with torch.no_grad():
         output = model(**inputs).waveform
 
-    print(output)
-    # output = output.clone().detach().cpu()
     output = output.cpu().numpy().squeeze()
     return output, model
 
