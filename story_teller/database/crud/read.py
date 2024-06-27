@@ -14,8 +14,13 @@ def get_translated_posts(db_client):
     return db_client.story_teller.posts.find(dict(status=StatusEnum.translated.value))
 
 
-def get_edited_posts(db_client):
+def get_edited_posts(db_client, sorted: bool = False):
     from story_teller.database.enum import StatusEnum
+
+    if sorted:
+        return db_client.story_teller.posts.find(
+            dict(status=StatusEnum.edited.value)
+        ).sort("created")
 
     return db_client.story_teller.posts.find(dict(status=StatusEnum.edited.value))
 

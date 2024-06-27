@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from transformers import VitsModel, AutoTokenizer, set_seed
 from vinorm import TTSnorm
-from typing import Text, List
+from typing import Text, List, Dict, Any
 from underthesea import sent_tokenize
 import torch
 from loguru import logger
@@ -11,29 +11,38 @@ import numpy as np
 
 
 class AudioGenerator(BaseModel):
-    tokenizer: AutoTokenizer
-    model: VitsModel
+    tokenizer: Any
+    model: Any
 
-    def __init__(self, device, model_name):
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __init__(self, device: Text, model_name: Text, seed: int):
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = VitsModel.from_pretrained(model_name).to(device)
         super().__init__(model=model, tokenizer=tokenizer)
+        set_seed(seed)
 
     def process_for_tts(self, paragraph: Text):
         import re
 
         pattern = r"([" + re.escape(",.?!()") + "])"
-        result = TTSnorm(paragraph, lower=False, unknown=False)
+        result = TTSnorm(paragraph, lower=False, unknown=False, punc=True)
         result = re.sub(pattern, r"\1 ' ", result)
         result = sent_tokenize(result)
         return result
 
     def pre_process(self, text: Text) -> List:
         paragraphs = text.split("\n\n")
-        paragraphs = [self.process_for_tts(par) for par in paragraphs]
+        paragraphs = [
+            dict(idx=idx, paragraph=self.process_for_tts(par))
+            for idx, par in enumerate(paragraphs)
+        ]
         return paragraphs
 
-    def generate(self, paragraph):
+    def generate(self, paragraph_dict: Dict):
+        idx = paragraph_dict["idx"]
+        paragraph = paragraph_dict["paragraph"]
         try:
             inputs = self.tokenizer(
                 paragraph,
@@ -52,16 +61,20 @@ class AudioGenerator(BaseModel):
             )
             raise e
         else:
-            return output
+            logger.success(f"Generated audio for paragraph {idx}")
+            return dict(idx=idx, output=output)
 
-    def post_process(self, waves):
+    def post_process(self, output_dict):
+
         silence_thresh = -35  # in dBFS, adjust according to your audio
         min_silence_len = 500  # in milliseconds
+        idx = output_dict["idx"]
+        output = output_dict["output"]
 
         # each paragraph has multiple output wave <-> each wave is a sentence
         try:
             filtered_audio = AudioSegment.empty()
-            for waveform in waves:
+            for waveform in output:
                 waveform_integers = np.int16(waveform * 32767)  # Convert to 16-bit PCM
 
                 # Convert the integer waveform to byte data
@@ -90,4 +103,8 @@ class AudioGenerator(BaseModel):
             logger.error(f"{type(e).__name__}: {e}")
             raise e
         else:
-            return filtered_audio
+            logger.success(f"Filtered silence and concat paragraph {idx}")
+            return dict(idx=idx, output=filtered_audio)
+
+    def set_speed(self, speed: float):
+        self.model.speaking_rate = speed
