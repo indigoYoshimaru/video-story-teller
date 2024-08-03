@@ -8,6 +8,6 @@ This repository is currently under development, so there are many updates to com
 
 ## Sample story output
 <audio controls>
-  <source src="story-sample/22.wav" type="audio/wav">
-  A sample story 
+  <source src="[story-sample/22.wav](https://github.com/indigoYoshimaru/video-story-teller/blob/d723d148ea9efc9da191edc012ff53caf42ca751/story-sample/22.wav)" type="audio/wav">
 </audio>
+
