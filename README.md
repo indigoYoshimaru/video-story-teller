@@ -8,4 +8,4 @@ This repository is currently under development, so there are many updates to com
 
 ## Sample story output
 
-[Play sample generated story audio](story-sample/22.wav)
+[Play sample generated story audio](index.html)
