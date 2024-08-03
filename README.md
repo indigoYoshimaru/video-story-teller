@@ -8,4 +8,4 @@ This repository is currently under development, so there are many updates to com
 
 ## Sample story output
 
-[Play sample generated story audio](index.html)
+[Play sample generated story audio](https://indigoyoshimaru.github.io/video-story-teller/)
