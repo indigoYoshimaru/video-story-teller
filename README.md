@@ -6,7 +6,8 @@ By leveraging the facebook/mms-tts models, I can develop an AI that narrates sto
 
 This repository is currently under development, so there are many updates to come, and the documentation is not yet complete. Stay tuned for more stories and updates!
 
-## Sample Story teller 
+## Sample story output
 <audio controls>
   <source src="story-sample/22.wav" type="audio/wav">
+  A sample story 
 </audio>
